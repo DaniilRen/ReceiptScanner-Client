@@ -17,12 +17,9 @@ pip install app/requirements.txt
 cd app
 pyinstaller snapshot-1-0.spec
 ```
-Application will be built as an exe file if app/dist directory
+This will launch pyinstaller build proccess. As result application will be built as an exe file in app/dist directory
 ## Run the app
 To launch app just click on exe file
 
-### Run without build
-To run app without build, complete dependencies installation and run:
-```
-python app/main.py
-```
+### Run without build / installation 
+To run app without build, complete point 1 in Installation proccess and simply run ``` python app/main.py ```
