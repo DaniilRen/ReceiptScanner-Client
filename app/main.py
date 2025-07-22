@@ -90,18 +90,20 @@ def main(page: ft.Page):
 			# Парсим параметры из URL
 			parsed = urllib.parse.urlparse(page.route)
 			params = urllib.parse.parse_qs(parsed.query)
+			_id = params.get("id", [""])[0]
 			img = params.get("img", [""])[0]
 			category = params.get("category", [""])[0]
 			date = params.get("date", [""])[0]
-			sum_ = params.get("sum", [""])[0]
+			_sum = params.get("sum", [""])[0]
 
 			# Декодируем параметры
-			img = urllib.parse.unquote(img)
-			category = urllib.parse.unquote(category)
-			date = urllib.parse.unquote(date)
-			sum_ = urllib.parse.unquote(sum_)
+			id_ = urllib.parse.unquote(_id)
+			img_ = urllib.parse.unquote(img)
+			category_ = urllib.parse.unquote(category)
+			date_ = urllib.parse.unquote(date)
+			sum_ = urllib.parse.unquote(_sum)
 
-			image_view = views.DetailedView(page, img, category, date, sum_)
+			image_view = views.DetailedView(page, id_, img_, category_, date_, sum_)
 			page.views.append(image_view)
 		page.update()
 			

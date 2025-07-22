@@ -150,9 +150,10 @@ class ReceiptsView(ft.View):
 			# Setting params to show receipt info on click
 			img_path = urllib.parse.quote(os.path.join(self.page.STORAGE_PATH, 'temp', receipt['file_name']))
 			category = urllib.parse.quote(receipt['category'])
+			id_ = urllib.parse.quote(str(receipt['id']))
 			date = urllib.parse.quote(date_)
 			sum_ = urllib.parse.quote(str(receipt['sum']))
-			route = f"/detailedview?img={img_path}&category={category}&date={date}&sum={sum_}"
+			route = f"/detailedview?id={id_}&img={img_path}&category={category}&date={date}&sum={sum_}"
 			self.page.go(route)
 
 		self.table.rows.append(
@@ -267,9 +268,19 @@ class ReceiptsView(ft.View):
 
 """ Detailed receipt view with photo and other data"""
 class DetailedView(ft.View):
-	def __init__(self, page: ft.Page, image_src: str, category: str, date: str, sum: str):
+	def __init__(self, page: ft.Page, id, image_src: str, category: str, date: str, sum: str):
 		super().__init__(route="/detailedview")
 		self.page = page
+		self.id = id
+
+		self.delete_button = ft.ElevatedButton(
+			text="Удалить",
+			icon=ft.Icons.DELETE, 
+			on_click=lambda e: utils.show_dialog(self,
+			 "Вы уверены, что хотите удалить чек?", 
+			 "Позже его нельзя будет восстановить"
+			 )
+		)
 
 		# Кнопка "Назад" в AppBar
 		self.appbar = ft.AppBar(
@@ -278,6 +289,7 @@ class DetailedView(ft.View):
 				tooltip="Назад",
 				on_click=lambda e: self.page.go("/receipts")
 			),
+			actions=[self.delete_button],
 			title=ft.Text("Просмотр изображения"),
 			bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST
 		)
@@ -329,9 +341,28 @@ class DetailedView(ft.View):
 			height=400, scroll=ft.ScrollMode.AUTO
 		)
 
+		self.page.dialog = ft.AlertDialog(
+			title=ft.Container(ft.Text(""), alignment=ft.alignment.center),
+			content=ft.Text(""),
+			actions=[
+				ft.TextButton("Отмена", on_click=lambda e: utils.close_dialog(self)),
+				ft.TextButton("Удалить", on_click=self.delete_receipt)
+			],
+			actions_alignment=ft.MainAxisAlignment.CENTER,
+		)
+
 		# Добавляем AppBar и контент во View
 		self.controls.append(self.appbar)
 		self.controls.append(self.content)
+	
+
+	def delete_receipt(self, e=None):
+		response = requests.delete(f"{self.page.ROOT_URL}/delete/{int(self.id)}",  headers=self.page.special_request_headers)
+		print(response)
+		print(f"=> Deleted receipt id={id}")
+		utils.close_dialog(self)
+		self.page.go("/receipts")
+
 
 
 """ Creating new receipt """
