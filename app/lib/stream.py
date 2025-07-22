@@ -38,3 +38,7 @@ class Stream():
 		self.cap = cv.VideoCapture(src)
 		self.available = self.cap.isOpened()
 
+	def apply_filter(self, src):
+		gaussian = cv.GaussianBlur(src, (0, 0), 2.0)
+		unsharp_image = cv.addWeighted(src, 2.0, gaussian, -1.0, 0)
+		return unsharp_image
