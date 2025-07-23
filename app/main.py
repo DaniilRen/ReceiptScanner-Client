@@ -22,7 +22,7 @@ def main(page: ft.Page):
 			storage_dir = os.path.realpath(config["STORAGE_PATH"])
 		else:
 			print("! Application runs in development mode")
-			storage_dir = os.path.realpath('assets')
+			storage_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), 'assets'))
 		os.makedirs(os.path.join(storage_dir, 'temp'), exist_ok=True)
 		page.STORAGE_PATH = storage_dir
 		print(f"=> Created storage dir: {storage_dir}")

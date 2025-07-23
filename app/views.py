@@ -478,13 +478,20 @@ class NewReceiptView(ft.View):
 		)
 
 		# Основной контейнер — горизонтальный ряд из двух колонок
-		self.main_row = ft.Row(
+		self.main_row = ft.Column(
+			controls=[ft.Row(
 			controls=[
 				self.form,
 				self.photo_column,
 			],
 			alignment=ft.MainAxisAlignment.CENTER,
 			spacing=50,
+		)],
+			alignment=ft.MainAxisAlignment.CENTER,
+			horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+			spacing=10,
+			expand=True,
+			scroll=ft.ScrollMode.AUTO
 		)
 
 		self.controls.append(self.appbar)
