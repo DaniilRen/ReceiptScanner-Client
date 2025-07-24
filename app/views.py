@@ -159,9 +159,9 @@ class ReceiptsView(ft.View):
 		self.table.rows.append(
 			ft.DataRow(
 				cells=[
+					ft.DataCell(ft.Text(date_, selectable=True)),
 					ft.DataCell(ft.Text(receipt['category'], selectable=True)),
 					ft.DataCell(ft.Text(receipt['sum'], selectable=True)),
-					ft.DataCell(ft.Text(date_, selectable=True)),
 					# ft.DataCell(ft.Text(photo))
 					controls.ClickableDatacell( 
 						text='Посмотреть фото', 
