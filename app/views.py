@@ -74,6 +74,9 @@ class ReceiptsView(ft.View):
 		super().__init__("/receipts")
 		self.page = page
 
+		# Info panel with receipts count
+		self.receipt_count = ft.Text(value=f"Всего чеков: {len(self.page.loaded_receipts)}")
+
 		# Blank table for receipts
 		self.table = ft.DataTable(
 			columns=[
@@ -129,6 +132,8 @@ class ReceiptsView(ft.View):
 			alignment=ft.MainAxisAlignment.SPACE_BETWEEN
 		)),
 		self.controls.append(self.category_dropdown)
+
+		self.controls.append(self.receipt_count)
 		
 		# table scroll works great only when Column height property is defined or when ListView is used
 		self.controls.append(ft.ListView(controls=[self.table], expand=True, height=400))
@@ -200,6 +205,10 @@ class ReceiptsView(ft.View):
 		else:
 			for receipt in self.page.loaded_receipts:
 				self.add_row(receipt)
+		try:
+			self.update_count()
+		except Exception as e:
+			pass
 
 	""" Get list of all receipts from server """
 	def get_all_receipts(self):
@@ -223,9 +232,11 @@ class ReceiptsView(ft.View):
 
 	""" Get receipts filtered by date"""	
 	def apply_filter(self, e):
+		print(self.start_filter_field.value, self.end_filter_field.value, self.category_dropdown.value)
 		start = utils.date_to_sql(self.start_filter_field.value)
 		end = utils.date_to_sql(self.end_filter_field.value)
 		category = self.category_dropdown.value
+		print(start, end, category)
 		if start is None and end is None:
 			start = "all"
 			end = "all"
@@ -236,15 +247,15 @@ class ReceiptsView(ft.View):
 			if start == end == category == "all":
 				self.reset_filter()
 				return 
-			resp = requests.get(f'{self.page.ROOT_URL}/filter_receipt/{start}/{end}/{category}', headers=self.page.request_headers)
-			print(resp)
-			if resp.status_code in [200, 204] and len(resp.json()) != 0:
-				self.page.loaded_receipts = []
-				for receipt in resp.json():
-					self.page.loaded_receipts.append(receipt)
-					self.load_photo(receipt)
-				print("=> Receipt filtered")
+
+			filtered = utils.get_filtered_receipts(self.page.loaded_receipts, start, end, category)
+			if not filtered is None:
+				self.page.loaded_receipts = filtered
 				self.load_receipts()
+				print("=> Receipt filtered")
+			else:
+				print("! Error while filtering receipts")
+
 
 	""" 
 	Get report from server.
@@ -264,6 +275,10 @@ class ReceiptsView(ft.View):
 				f.write(resp.content)
 				utils.show_dialog(self, text="Отчет сформирован", desc=f"Путь к файлу: {path}")
 				print("=> Report loaded")
+
+	def update_count(self):
+		self.receipt_count.value = f"Всего чеков: {len(self.page.loaded_receipts)}"
+		self.receipt_count.update()
 
 
 """ Detailed receipt view with photo and other data"""

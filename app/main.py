@@ -57,13 +57,14 @@ def main(page: ft.Page):
 			# Removing temp files
 			print("=> Application is closing. Performing cleanup...")
 			temp_dir = os.path.join(page.STORAGE_PATH, 'temp')
+			count = 0
+			start_count = len(os.listdir(temp_dir))
 			for item_name in os.listdir(temp_dir):
 				item_path = os.path.join(temp_dir, item_name)
 				if os.path.isfile(item_path):
 					os.remove(item_path)
-					print(f"Removed file: {item_path}")
-				else:
-					print(f"Kept in directory: {item_path}")
+					count += 1
+			print(f"Removed {count} of {start_count} files")
 			
 			page.window.prevent_close = False
 			page.window.on_event = None  

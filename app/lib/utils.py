@@ -106,3 +106,17 @@ def close_dialog(self):
 	self.page.close(self.page.dialog)
 	self.page.update()
 	print("Dialog closed")
+
+
+def get_filtered_receipts(receipts, start, end, category):
+	try:
+		if start == end == "all":
+			return [r for r in receipts if r["category"] == category]
+		elif category == 'all':
+	
+			return [r for r in receipts if start <= date_to_sql(date_to_text(r["receipt_date"])) <= end]
+		else:
+			return [r for r in receipts if r["category"] == category and start <= date_to_sql(date_to_text(r["receipt_date"])) <= end]
+	except Exception as e:
+		print(e)
+		return None
