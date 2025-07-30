@@ -62,22 +62,22 @@ class LoginView(ft.View):
 				'Authorization': f'Bearer {token}'
 			}
 			self.result_text.value = "Успешный вход!"
-			self.page.go("/receipts")
+			self.page.go("/items")
 		else:
 			self.result_text.value = "Неверный логин или пароль"
 		self.update()
 
 
-""" Main receipts table with filters """
-class ReceiptsView(ft.View):
+""" Main items table with filters """
+class ItemsView(ft.View):
 	def __init__(self, page: ft.Page):
-		super().__init__("/receipts")
+		super().__init__("/items")
 		self.page = page
 
-		# Info panel with receipts count
-		self.receipt_count = ft.Text(value=f"Всего чеков: {len(self.page.loaded_receipts)}")
+		# Info panel with items count
+		self.item_count = ft.Text(value=f"Всего позиций: {len(self.page.loaded_items)}")
 
-		# Blank table for receipts
+		# Blank table for items
 		self.table = ft.DataTable(
 			columns=[
 				ft.DataColumn(ft.Text("Дата")),
@@ -89,7 +89,7 @@ class ReceiptsView(ft.View):
 			expand=True
 		)
 		
-		self.controls.append(ft.AppBar(title=ft.Text("База чеков"), bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST))
+		self.controls.append(ft.AppBar(title=ft.Text("База данных"), bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST))
 		self.start_filter_field = ft.TextField(label="Начало")
 		self.end_filter_field = ft.TextField(label="Конец")
 		self.category_dropdown = ft.Dropdown(
@@ -102,7 +102,12 @@ class ReceiptsView(ft.View):
 			tooltip="Reload",
 			on_click=self.reset_filter
 		)
-		self.controls.append(ft.Text(value="Фильтр по дате выдачи"))
+		self.category_button = ft.ElevatedButton(
+			"Категории", 
+			icon=ft.Icons.CATEGORY, 
+			on_click=lambda e: self.page.go('/category')
+		)
+		self.controls.append(ft.Text(value="Фильтр по датам"))
 		self.controls.append(
 			ft.Row([
 				ft.Row([
@@ -119,9 +124,10 @@ class ReceiptsView(ft.View):
 						"Сформировать отчет", 
 						on_click=self.get_report
 					),
+					self.category_button,
 					ft.ElevatedButton(
-						"Добавить чек", 
-						on_click=lambda e: self.page.go('/newreceipt')
+						"Добавить", 
+						on_click=lambda e: self.page.go('/newitem')
 					)
 				])
 			],
@@ -129,7 +135,7 @@ class ReceiptsView(ft.View):
 		)),
 		self.controls.append(self.category_dropdown)
 
-		self.controls.append(self.receipt_count)
+		self.controls.append(self.item_count)
 		
 		# table scroll works great only when Column height property is defined or when ListView is used
 		self.controls.append(ft.ListView(controls=[self.table], expand=True, height=400))
@@ -143,17 +149,17 @@ class ReceiptsView(ft.View):
 			actions_alignment=ft.MainAxisAlignment.CENTER,
 		)
 
-	""" Add receipt row to table """
-	def add_row(self, receipt):
-		date_ = utils.date_to_text(receipt['receipt_date'])
+	""" Add item row to table """
+	def add_row(self, item):
+		date_ = utils.date_to_text(item['creation_date'])
 
 		def on_photo_click(e):
-			# Setting params to show receipt info on click
-			img_path = urllib.parse.quote(os.path.join(self.page.STORAGE_PATH, 'temp', receipt['file_name']))
-			category = urllib.parse.quote(receipt['category'])
-			id_ = urllib.parse.quote(str(receipt['id']))
+			# Setting params to show item info on click
+			img_path = urllib.parse.quote(os.path.join(self.page.STORAGE_PATH, 'temp', item['file_name']))
+			category = urllib.parse.quote(item['category'])
+			id_ = urllib.parse.quote(str(item['id']))
 			date = urllib.parse.quote(date_)
-			sum_ = urllib.parse.quote(str(receipt['sum']))
+			sum_ = urllib.parse.quote(str(item['sum']))
 			route = f"/detailedview?id={id_}&img={img_path}&category={category}&date={date}&sum={sum_}"
 			self.page.go(route)
 
@@ -161,8 +167,8 @@ class ReceiptsView(ft.View):
 			ft.DataRow(
 				cells=[
 					ft.DataCell(ft.Text(date_, selectable=True)),
-					ft.DataCell(ft.Text(receipt['category'], selectable=True)),
-					ft.DataCell(ft.Text(receipt['sum'], selectable=True)),
+					ft.DataCell(ft.Text(item['category'], selectable=True)),
+					ft.DataCell(ft.Text(item['sum'], selectable=True)),
 					# ft.DataCell(ft.Text(photo))
 					controls.ClickableDatacell( 
 						text='Посмотреть фото', 
@@ -184,47 +190,47 @@ class ReceiptsView(ft.View):
 			if return_categories: return resp.json()
 
 	""" Load file image from server and save it to local storage """
-	def load_photo(self, receipt):
-		resp = requests.get(f"{self.page.ROOT_URL}/files/{receipt['id']}", headers=self.page.request_headers)
-		with open(os.path.join(self.page.STORAGE_PATH, 'temp', receipt['file_name']), 'wb') as f:
+	def load_photo(self, item):
+		resp = requests.get(f"{self.page.ROOT_URL}/files/{item['id']}", headers=self.page.request_headers)
+		with open(os.path.join(self.page.STORAGE_PATH, 'temp', item['file_name']), 'wb') as f:
 			f.write(resp.content)
 
-	""" Load receipts from buffer and add them to table """
-	def load_receipts(self):
+	""" Load items from buffer and add them to table """
+	def load_items(self):
 		if self.page.categories == []:
 			self.load_categories()
 		self.table.rows.clear()
-		if self.page.loaded_receipts == []:
-			self.get_all_receipts()
-			for receipt in self.page.loaded_receipts:
-				self.add_row(receipt)
+		if self.page.loaded_items == []:
+			self.get_all_items()
+			for item in self.page.loaded_items:
+				self.add_row(item)
 		else:
-			for receipt in self.page.loaded_receipts:
-				self.add_row(receipt)
+			for item in self.page.loaded_items:
+				self.add_row(item)
 		try:
 			self.update_count()
 		except Exception as e:
 			pass
 
-	""" Get list of all receipts from server """
-	def get_all_receipts(self):
-		resp = requests.get(f'{self.page.ROOT_URL}/receipt/all', headers=self.page.request_headers)
+	""" Get list of all items from server """
+	def get_all_items(self):
+		resp = requests.get(f'{self.page.ROOT_URL}/item/all', headers=self.page.request_headers)
 		if resp.status_code in [200, 204]:
-			for receipt in resp.json():
-				self.page.loaded_receipts.append(receipt)
-				self.load_photo(receipt)
-		print("=> Loaded all receipts from server")
+			for item in resp.json():
+				self.page.loaded_items.append(item)
+				self.load_photo(item)
+		print("=> Loaded all items from server")
 
-	""" Reset filter fields and updates receipts table """
+	""" Reset filter fields and updates items table """
 	def reset_filter(self, e=None):
 		self.start_filter_field.value = None
 		self.end_filter_field.value = None
 		self.category_dropdown.value = "Все"
-		self.page.loaded_receipts = []
-		self.load_receipts()
-		print("=> Receipt filter is default now")
+		self.page.loaded_items = []
+		self.load_items()
+		print("=> Item filter is default now")
 
-	""" Get receipts filtered by date"""	
+	""" Get item filtered by date"""	
 	def apply_filter(self, e):
 		print(self.start_filter_field.value, self.end_filter_field.value, self.category_dropdown.value)
 		start = utils.date_to_sql(self.start_filter_field.value)
@@ -237,28 +243,28 @@ class ReceiptsView(ft.View):
 		if category in [None, "Все"]:
 			category = "all"
 		if all([start, end, category]):
-			# if no filters set, load all receipts
+			# if no filters set, load all items
 			if start == end == category == "all":
 				self.reset_filter()
 				return 
 
-			filtered = utils.get_filtered_receipts(self.page.loaded_receipts, start, end, category)
+			filtered = utils.get_filtered_items(self.page.loaded_items, start, end, category)
 			if not filtered is None:
-				self.page.loaded_receipts = filtered
-				self.load_receipts()
-				print("=> Receipt filtered")
+				self.page.loaded_items = filtered
+				self.load_items()
+				print("=> Item filtered")
 			else:
-				print("! Error while filtering receipts")
+				print("! Error while filtering items")
 
 
 	""" 
 	Get report from server.
-	Uses filtered receipts, 
-	otherwise returns report about all receipts 
+	Uses filtered items, 
+	otherwise returns report about all items 
 	"""
 	def get_report(self, e):
 		id_list = json.dumps({
-			"id_list": [int(r['id']) for r in self.page.loaded_receipts]
+			"id_list": [int(r['id']) for r in self.page.loaded_items]
 		})
 		resp = requests.get(f'{self.page.ROOT_URL}/report', data=id_list, headers=self.page.special_request_headers)
 		print(resp)
@@ -271,11 +277,11 @@ class ReceiptsView(ft.View):
 				print("=> Report loaded")
 
 	def update_count(self):
-		self.receipt_count.value = f"Всего чеков: {len(self.page.loaded_receipts)}"
-		self.receipt_count.update()
+		self.item_count.value = f"Всего позиций: {len(self.page.loaded_items)}"
+		self.item_count.update()
 
 
-""" Detailed receipt view with photo and other data"""
+""" Detailed item view with image and other info"""
 class DetailedView(ft.View):
 	def __init__(self, page: ft.Page, id, image_src: str, category: str, date: str, sum: str):
 		super().__init__(route="/detailedview")
@@ -286,7 +292,7 @@ class DetailedView(ft.View):
 			text="Удалить",
 			icon=ft.Icons.DELETE, 
 			on_click=lambda e: utils.show_dialog(self,
-			 "Вы уверены, что хотите удалить чек?", 
+			 "Вы уверены, что хотите удалить элемент?", 
 			 "Позже его нельзя будет восстановить"
 			 )
 		)
@@ -296,7 +302,7 @@ class DetailedView(ft.View):
 			leading=ft.IconButton(
 				icon=ft.Icons.ARROW_BACK,
 				tooltip="Назад",
-				on_click=lambda e: self.page.go("/receipts")
+				on_click=lambda e: self.page.go("/items")
 			),
 			actions=[self.delete_button],
 			title=ft.Text("Просмотр изображения"),
@@ -355,7 +361,7 @@ class DetailedView(ft.View):
 			content=ft.Text(""),
 			actions=[
 				ft.TextButton("Отмена", on_click=lambda e: utils.close_dialog(self)),
-				ft.TextButton("Удалить", on_click=self.delete_receipt)
+				ft.TextButton("Удалить", on_click=self.delete_item)
 			],
 			actions_alignment=ft.MainAxisAlignment.CENTER,
 		)
@@ -365,19 +371,19 @@ class DetailedView(ft.View):
 		self.controls.append(self.content)
 	
 
-	def delete_receipt(self, e=None):
+	def delete_item(self, e=None):
 		response = requests.delete(f"{self.page.ROOT_URL}/delete/{int(self.id)}",  headers=self.page.special_request_headers)
 		print(response)
-		print(f"=> Deleted receipt id={id}")
+		print(f"=> Deleted item id={id}")
 		utils.close_dialog(self)
-		self.page.go("/receipts")
+		self.page.go("/items")
 
 
 
-""" Creating new receipt """
-class NewReceiptView(ft.View):
+""" Creating new item """
+class NewItemView(ft.View):
 	def __init__(self, page: ft.Page):
-		super().__init__(route='/newreceipt')
+		super().__init__(route='/newitem')
 		self.page = page
 		self.stream = Stream()
 
@@ -392,7 +398,7 @@ class NewReceiptView(ft.View):
 				tooltip="Назад",
 				on_click=self.on_exit
 			),
-			title=ft.Text("Добавление чека"),
+			title=ft.Text("Добавление"),
 			bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST
 		)
 
@@ -408,7 +414,7 @@ class NewReceiptView(ft.View):
 			width=200
 		)
 		self.date_field = ft.TextField(
-			label="Дата выдачи чека",
+			label="Дата",
 			width=200,
 			value=datetime.date.today().strftime('%d.%m.%Y'),
 		)
@@ -576,7 +582,7 @@ class NewReceiptView(ft.View):
 		if not self.file_path is None:
 			os.remove(self.file_path)
 		print(f"=> Stream stopped, cap released. Temp files removed")
-		self.page.go("/receipts")
+		self.page.go("/items")
 		
 	""" Update frame in photo_placeholder """
 	def update_frame(self, e=None):
@@ -613,7 +619,7 @@ class NewReceiptView(ft.View):
 			utils.show_dialog(self, "Ошибка", "Некорректный источник")
 		self.page.update()
 
-	""" Submit data from receipt creation form """
+	""" Submit data from item creation form """
 	def submit(self, e):
 		category = self.category_dropdown.value
 		sum_ = self.sum_field.value
@@ -632,13 +638,68 @@ class NewReceiptView(ft.View):
 			utils.show_dialog(self, "Ошибка", "Сумма введена некорректно. В поле суммы необходимо вносить только числовые значения")
 			return
 
-		new_receipt = json.dumps({
+		new_item = json.dumps({
 			"category": category,
 			"sum": sum_float,
-			"receipt_date": date_,
+			"creation_date": date_,
 			"image": img_base64
 		})
-		response = requests.post(f'{self.page.ROOT_URL}/add', data=new_receipt, headers=self.page.special_request_headers)
+		response = requests.post(f'{self.page.ROOT_URL}/add', data=new_item, headers=self.page.special_request_headers)
 		print(response)
-		utils.show_dialog(self, "Чек добавлен", "Данные занесены в базу")
+		utils.show_dialog(self, "Данные отправлены!", "Чтобы увидеть изменения, перезагрузите страницу")
 		self.page.update()
+
+
+""" Creating new item """
+class CategoryView(ft.View):
+	def __init__(self, page: ft.Page):
+		super().__init__(route='/category')
+		self.page = page
+
+		# AppBar
+		self.appbar = ft.AppBar(
+			leading=ft.IconButton(
+				icon=ft.Icons.ARROW_BACK,
+				tooltip="Назад",
+				on_click=self.on_exit
+			),
+			title=ft.Text("Категории документов"),
+			bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST
+		)
+
+		# Blank table for items
+		self.table = ft.DataTable(
+			columns=[
+				ft.DataColumn(ft.Text("Категория")),
+			],
+			rows=[],
+			expand=True
+		)
+
+		self.controls.append(self.appbar)	
+		self.controls.append(ft.ListView(controls=[self.table], expand=True, height=400))
+	
+	""" Add item row to table """
+	def add_rows(self):
+		for i in self.page.categories:
+			self.table.rows.append(
+				ft.DataRow(
+					cells=[
+						ft.DataCell(ft.Text(i, selectable=True))
+					],
+				)
+			)
+			self.page.update()
+
+	""" 
+	Load list of available categories from /items'server
+	return_categories (boolean) - return list of categories as result
+	"""
+	def load_categories(self, return_categories=False):
+		resp = requests.get(f'{self.page.ROOT_URL}/categories', headers=self.page.request_headers)
+		if resp.status_code in [200, 204]:
+			self.page.categories = resp.json()
+			if return_categories: return resp.json()
+	
+	def on_exit(self, e=None):
+		self.page.go('/items')

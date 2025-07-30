@@ -46,10 +46,10 @@ def main(page: ft.Page):
 	page.vertical_alignment = ft.MainAxisAlignment.CENTER
 	page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
 
-	page.title = "ReceiptScanner"
+	page.title = "ItemScanner"
 	page.token = None
 	page.request_headers = None
-	page.loaded_receipts = [] 
+	page.loaded_items = [] 
 	page.categories = []
 
 	def on_close(e: ft.ControlEvent):
@@ -78,15 +78,17 @@ def main(page: ft.Page):
 		if page.route == '/login':
 			login_view = views.LoginView(page)
 			page.views.append(login_view)
-		elif page.route == "/receipts":
-			receipts_view = views.ReceiptsView(page)
-			receipts_view.load_receipts()
-			page.views.append(receipts_view)
-		elif page.route == "/newreceipt":
-			new_receipt_view = views.NewReceiptView(page)
-			page.views.append(new_receipt_view)
-			# Schedule the streaming coroutine properly
-			# asyncio.create_task(new_receipt_view.stream())
+		elif page.route == "/items":
+			items_view = views.ItemsView(page)
+			items_view.load_items()
+			page.views.append(items_view)
+		elif page.route == "/newitem":
+			new_item_view = views.NewItemView(page)
+			page.views.append(new_item_view)
+		elif page.route == "/category":
+			category_view = views.CategoryView(page)
+			category_view.add_rows()
+			page.views.append(category_view)
 		elif page.route.startswith("/detailedview"):
 			# Парсим параметры из URL
 			parsed = urllib.parse.urlparse(page.route)
