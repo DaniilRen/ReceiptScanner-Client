@@ -112,10 +112,6 @@ class ReceiptsView(ft.View):
 						"Отфильтровать", 
 						on_click=self.apply_filter
 					),
-					ft.ElevatedButton(
-						"Сбросить фильтр", 
-						on_click=lambda e: self.reset_filter(e, dialog=True)
-					),
 					self.reload_button
 				]),
 				ft.Row([
@@ -220,14 +216,12 @@ class ReceiptsView(ft.View):
 		print("=> Loaded all receipts from server")
 
 	""" Reset filter fields and updates receipts table """
-	def reset_filter(self, e=None, dialog=False):
+	def reset_filter(self, e=None):
 		self.start_filter_field.value = None
 		self.end_filter_field.value = None
 		self.category_dropdown.value = "Все"
 		self.page.loaded_receipts = []
 		self.load_receipts()
-		if dialog:
-			utils.show_dialog(self, text="Фильтр сброшен", desc="Показаны все доступные чеки")
 		print("=> Receipt filter is default now")
 
 	""" Get receipts filtered by date"""	
