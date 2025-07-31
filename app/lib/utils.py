@@ -113,7 +113,6 @@ def get_filtered_items(items, start, end, category):
 		if start == end == "all":
 			return [r for r in items if r["category"] == category]
 		elif category == 'all':
-	
 			return [r for r in items if start <= date_to_sql(date_to_text(r["creation_date"])) <= end]
 		else:
 			return [r for r in items if r["category"] == category and \

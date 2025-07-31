@@ -49,7 +49,8 @@ def main(page: ft.Page):
 	page.title = "ItemScanner"
 	page.token = None
 	page.request_headers = None
-	page.loaded_items = [] 
+	page.loaded_items = None
+	page.filtered_items = None 
 	page.categories = []
 
 	def on_close(e: ft.ControlEvent):
@@ -80,14 +81,14 @@ def main(page: ft.Page):
 			page.views.append(login_view)
 		elif page.route == "/items":
 			items_view = views.ItemsView(page)
-			items_view.load_items()
+			items_view.reload_items()
 			page.views.append(items_view)
 		elif page.route == "/newitem":
 			new_item_view = views.NewItemView(page)
 			page.views.append(new_item_view)
 		elif page.route == "/category":
 			category_view = views.CategoryView(page)
-			category_view.add_rows()
+			category_view.load_categories()
 			page.views.append(category_view)
 		elif page.route.startswith("/detailedview"):
 			# Парсим параметры из URL

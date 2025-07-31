@@ -75,7 +75,7 @@ class ItemsView(ft.View):
 		self.page = page
 
 		# Info panel with items count
-		self.item_count = ft.Text(value=f"Всего позиций: {len(self.page.loaded_items)}")
+		self.item_count = ft.Text(value=f"Всего позиций: 0")
 
 		# Blank table for items
 		self.table = ft.DataTable(
@@ -137,9 +137,7 @@ class ItemsView(ft.View):
 
 		self.controls.append(self.item_count)
 		
-		# table scroll works great only when Column height property is defined or when ListView is used
 		self.controls.append(ft.ListView(controls=[self.table], expand=True, height=400))
-		# self.controls.append(ft.Column(controls=[self.table], expand=True, height=400, scroll=ft.ScrollMode.AUTO))
 		self.page.dialog = ft.AlertDialog(
 			title=ft.Container(ft.Text(""), alignment=ft.alignment.center),
 			content=ft.Text(""),
@@ -196,29 +194,34 @@ class ItemsView(ft.View):
 			f.write(resp.content)
 
 	""" Load items from buffer and add them to table """
-	def load_items(self):
-		if self.page.categories == []:
-			self.load_categories()
+	def reload_items(self):
 		self.table.rows.clear()
-		if self.page.loaded_items == []:
-			self.get_all_items()
-			for item in self.page.loaded_items:
-				self.add_row(item)
+		if self.page.loaded_items is None:
+			self.load_all_items()
+			current_items = self.page.loaded_items
 		else:
-			for item in self.page.loaded_items:
+			if self.page.filtered_items is None: 
+				current_items = self.page.loaded_items
+			else:
+				current_items = self.page.filtered_items
+			
+			for item in current_items:
 				self.add_row(item)
-		try:
-			self.update_count()
-		except Exception as e:
-			pass
+
+		self.page.update()
+		self.update_count(current_items)
 
 	""" Get list of all items from server """
-	def get_all_items(self):
+	def load_all_items(self):
 		resp = requests.get(f'{self.page.ROOT_URL}/item/all', headers=self.page.request_headers)
 		if resp.status_code in [200, 204]:
+			loaded_items = []
 			for item in resp.json():
-				self.page.loaded_items.append(item)
+				loaded_items.append(item)
 				self.load_photo(item)
+			self.page.loaded_items = loaded_items
+			for item in self.page.loaded_items:
+				self.add_row(item)
 		print("=> Loaded all items from server")
 
 	""" Reset filter fields and updates items table """
@@ -226,9 +229,10 @@ class ItemsView(ft.View):
 		self.start_filter_field.value = None
 		self.end_filter_field.value = None
 		self.category_dropdown.value = "Все"
-		self.page.loaded_items = []
-		self.load_items()
-		print("=> Item filter is default now")
+		self.page.filtered_items = None
+		self.page.loaded_items = None
+		self.reload_items()
+		print("=> Filter was reset")
 
 	""" Get item filtered by date"""	
 	def apply_filter(self, e):
@@ -236,7 +240,6 @@ class ItemsView(ft.View):
 		start = utils.date_to_sql(self.start_filter_field.value)
 		end = utils.date_to_sql(self.end_filter_field.value)
 		category = self.category_dropdown.value
-		print(start, end, category)
 		if start is None and end is None:
 			start = "all"
 			end = "all"
@@ -245,17 +248,18 @@ class ItemsView(ft.View):
 		if all([start, end, category]):
 			# if no filters set, load all items
 			if start == end == category == "all":
-				self.reset_filter()
-				return 
-
-			filtered = utils.get_filtered_items(self.page.loaded_items, start, end, category)
-			if not filtered is None:
-				self.page.loaded_items = filtered
-				self.load_items()
-				print("=> Item filtered")
+				self.reset_filter() 
+				return
 			else:
-				print("! Error while filtering items")
-
+				print(start, end, category)
+				filtered = utils.get_filtered_items(self.page.loaded_items, start, end, category)
+				if not filtered is None:
+					self.page.filtered_items = filtered
+					print("filtered:", len(filtered), "loaded:", len(self.page.loaded_items))
+					self.reload_items()
+					print("=> Items table filtered")
+				else:
+					print("! Error while filtering items")
 
 	""" 
 	Get report from server.
@@ -276,10 +280,12 @@ class ItemsView(ft.View):
 				utils.show_dialog(self, text="Отчет сформирован", desc=f"Путь к файлу: {path}")
 				print("=> Report loaded")
 
-	def update_count(self):
-		self.item_count.value = f"Всего позиций: {len(self.page.loaded_items)}"
-		self.item_count.update()
-
+	def update_count(self, items):
+		try:
+			self.item_count.value = f"Всего позиций: {len(items)}"
+			self.item_count.update()
+		except Exception as e:
+			print(e)
 
 """ Detailed item view with image and other info"""
 class DetailedView(ft.View):
@@ -655,6 +661,13 @@ class CategoryView(ft.View):
 	def __init__(self, page: ft.Page):
 		super().__init__(route='/category')
 		self.page = page
+		self.new_category_field = ft.TextField(label="Новая категория", width=300)
+		self.add_button = ft.ElevatedButton(text="Добавить", on_click=self.add_category)
+		self.reload_button = ft.IconButton(
+			icon=ft.Icons.REFRESH,
+			tooltip="Reload",
+			on_click=self.load_categories
+		)
 
 		# AppBar
 		self.appbar = ft.AppBar(
@@ -670,36 +683,81 @@ class CategoryView(ft.View):
 		# Blank table for items
 		self.table = ft.DataTable(
 			columns=[
-				ft.DataColumn(ft.Text("Категория")),
+				ft.DataColumn(ft.Text("")),
 			],
 			rows=[],
 			expand=True
 		)
 
+		self.main_content = ft.Column(
+			controls=[
+				ft.Row(
+					controls=[
+						self.new_category_field,
+						self.add_button,
+						self.reload_button
+					],
+					alignment=ft.MainAxisAlignment.CENTER,
+					spacing=50,
+				),
+				self.table
+			],
+			alignment=ft.MainAxisAlignment.CENTER,
+			horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+			spacing=10,
+			expand=True,
+			scroll=ft.ScrollMode.AUTO
+		)
+
+		self.page.dialog = ft.AlertDialog(
+			title=ft.Container(ft.Text(""), alignment=ft.alignment.center),
+			content=ft.Text(""),
+			actions=[
+				ft.TextButton("OK", on_click=lambda e: utils.close_dialog(self))
+			],
+			actions_alignment=ft.MainAxisAlignment.CENTER,
+		)
+
 		self.controls.append(self.appbar)	
-		self.controls.append(ft.ListView(controls=[self.table], expand=True, height=400))
+		self.controls.append(self.main_content)
+
+	""" Add new category to db """
+	def add_category(self, e=None):
+		category = self.new_category_field.value
+		if not str(category).isalnum():
+			print(f"Wrong 'category' field format")
+			utils.show_dialog(self, "Заполните данные!", "вы не указали название новой категории")
+		else:
+			new_category = json.dumps({
+				"category": category,
+			})
+			response = requests.post(f'{self.page.ROOT_URL}/category', data=new_category, headers=self.page.special_request_headers)
+			print(response)
+			utils.show_dialog(self, "Данные отправлены!", "Новая категория сохранена")
+			self.page.update()
+		
 	
 	""" Add item row to table """
-	def add_rows(self):
-		for i in self.page.categories:
-			self.table.rows.append(
-				ft.DataRow(
-					cells=[
-						ft.DataCell(ft.Text(i, selectable=True))
-					],
-				)
+	def add_row(self, category):
+		self.table.rows.append(
+			ft.DataRow(
+				cells=[
+					ft.DataCell(ft.Text(category, selectable=True))
+				]
 			)
-			self.page.update()
+		)
+		self.page.update()
 
-	""" 
-	Load list of available categories from /items'server
-	return_categories (boolean) - return list of categories as result
-	"""
-	def load_categories(self, return_categories=False):
+	""" Load list of available categories from server """
+	def load_categories(self, e=None):
 		resp = requests.get(f'{self.page.ROOT_URL}/categories', headers=self.page.request_headers)
 		if resp.status_code in [200, 204]:
+			self.table.rows.clear()
 			self.page.categories = resp.json()
-			if return_categories: return resp.json()
+			for cat in self.page.categories:
+				self.add_row(cat)
+			print("=> Loaded categories")
+
 	
 	def on_exit(self, e=None):
 		self.page.go('/items')
