@@ -1,5 +1,5 @@
 # Client app
-Desktop client for receipt app
+Desktop Photis client
 works with windows 10/11
 
 ## Installation
