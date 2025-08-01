@@ -36,8 +36,7 @@ def main(page: ft.Page):
 	except Exception as e:
 		# default theme
 		page.theme = ft.Theme(color_scheme_seed='#D4E9F7')
-	finally:
-		page.theme_mode=ft.ThemeMode.LIGHT
+	page.theme_mode=ft.ThemeMode.LIGHT
 
 	# need to fix icon
 	page.window.prevent_close = True
@@ -46,10 +45,11 @@ def main(page: ft.Page):
 	page.vertical_alignment = ft.MainAxisAlignment.CENTER
 	page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
 
-	page.title = "ReceiptScanner"
+	page.title = "ItemScanner"
 	page.token = None
 	page.request_headers = None
-	page.loaded_receipts = [] 
+	page.loaded_items = None
+	page.filtered_items = None 
 	page.categories = []
 
 	def on_close(e: ft.ControlEvent):
@@ -71,41 +71,38 @@ def main(page: ft.Page):
 			page.update()
 			page.window.close() 
 
+	def parse_detailed_view_params():
+		# parsing params from URL
+		parsed = urllib.parse.urlparse(page.route)
+		params = urllib.parse.parse_qs(parsed.query)
+		_id = params.get("id", [""])[0]
+		img = params.get("img", [""])[0]
+		category = params.get("category", [""])[0]
+		date = params.get("date", [""])[0]
+		_sum = params.get("sum", [""])[0]
+
+		# decoding route params 
+		id_ = urllib.parse.unquote(_id)
+		img_ = urllib.parse.unquote(img)
+		category_ = urllib.parse.unquote(category)
+		date_ = urllib.parse.unquote(date)
+		sum_ = urllib.parse.unquote(_sum)
+		return [id_, img_, category_, date_, sum_]
+
 
 	def route_change(route):
-		print(f"changed route: {page.route}")
+		print(f"- {page.route}")
 		page.views.clear()
 		if page.route == '/login':
-			login_view = views.LoginView(page)
-			page.views.append(login_view)
-		elif page.route == "/receipts":
-			receipts_view = views.ReceiptsView(page)
-			receipts_view.load_receipts()
-			page.views.append(receipts_view)
-		elif page.route == "/newreceipt":
-			new_receipt_view = views.NewReceiptView(page)
-			page.views.append(new_receipt_view)
-			# Schedule the streaming coroutine properly
-			# asyncio.create_task(new_receipt_view.stream())
+			page.views.append(views.LoginView(page))
+		elif page.route == "/items":
+			page.views.append(views.ItemsView(page))
+		elif page.route == "/newitem":
+			page.views.append(views.NewItemView(page))
+		elif page.route == "/category":
+			page.views.append(views.CategoryView(page))
 		elif page.route.startswith("/detailedview"):
-			# Парсим параметры из URL
-			parsed = urllib.parse.urlparse(page.route)
-			params = urllib.parse.parse_qs(parsed.query)
-			_id = params.get("id", [""])[0]
-			img = params.get("img", [""])[0]
-			category = params.get("category", [""])[0]
-			date = params.get("date", [""])[0]
-			_sum = params.get("sum", [""])[0]
-
-			# Декодируем параметры
-			id_ = urllib.parse.unquote(_id)
-			img_ = urllib.parse.unquote(img)
-			category_ = urllib.parse.unquote(category)
-			date_ = urllib.parse.unquote(date)
-			sum_ = urllib.parse.unquote(_sum)
-
-			image_view = views.DetailedView(page, id_, img_, category_, date_, sum_)
-			page.views.append(image_view)
+			page.views.append(views.DetailedView(page, *parse_detailed_view_params()))
 		page.update()
 			
 

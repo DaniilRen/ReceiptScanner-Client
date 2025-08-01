@@ -18,6 +18,7 @@ class Stream():
 		ret, frame = self.cap.read()
 		if not ret:
 			return False
+		self.frame_shape = frame.shape[:2]
 		return frame
 
 	def to_base64(self, frame):
@@ -26,7 +27,7 @@ class Stream():
 
 	# frame in base64 encoding
 	def get_frame(self):
-		return self.to_base64(self.apply_filter(self.get_frame_raw()))
+		return self.to_base64(self.apply_filter(self.get_frame_raw(), mask=False))
 
 	def release(self):
 		if self.available:
@@ -37,18 +38,17 @@ class Stream():
 		self.cap = cv.VideoCapture(src)
 		self.available = self.cap.isOpened()
 
-	def apply_filter(self, src):
-		self.frame_shape = (640, 360)
-		frame = cv.cvtColor(src, cv.COLOR_BGR2HSV)
-		frame = frame[120:480, 0:640]
-		
-		mask = cv.inRange(frame, (0, 0, 120), (255, 255, 255))
-
+	def apply_filter(self, frame, mask=False):
 		gaussian = cv.GaussianBlur(frame, (0, 0), 2.0)
 		frame = cv.addWeighted(frame, 2.0, gaussian, -1.0, 0)
 
-		frame = cv.bitwise_and(frame, frame, mask=mask)
-		frame = cv.rotate(frame, cv.ROTATE_90_CLOCKWISE)
-		frame = cv.cvtColor(frame, cv.COLOR_HSV2BGR)
+		if mask:
+			self.frame_shape = (640, 360)	
+			frame = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+			frame = frame[120:480, 0:640]
+			mask = cv.inRange(frame, (0, 0, 120), (255, 255, 255))
+			frame = cv.bitwise_and(frame, frame, mask=mask)
+			frame = cv.rotate(frame, cv.ROTATE_90_CLOCKWISE)
+			frame = cv.cvtColor(frame, cv.COLOR_HSV2BGR)
 		return frame
 	
