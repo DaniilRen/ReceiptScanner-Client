@@ -1,6 +1,5 @@
-# Client app
-Desktop Photis client
-works with windows 10/11
+# Photis desktop client
+Compatible with windows 10/11 and linux distributions
 
 ## Installation
 1. Create and activate python venv:
