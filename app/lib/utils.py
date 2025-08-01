@@ -16,11 +16,10 @@ def decode_base64(b64_string):
 	if ',' in b64_string:
 		b64_string = b64_string.split(',')[1]
 	try:
-		img_bin = base64.b64decode(b64_string)
+		return base64.b64decode(b64_string)
 	except Exception as e:
 		print(f"Exception while enconding base64 data: {e}")
 		return None 
-	return img_bin
 
 
 """ Clamp size of frame with proportions """
@@ -28,8 +27,7 @@ def clamp_shape(shape, target_size=600):
 	width, height = shape[1], shape[0]
 	if width >= height:
 		return (int(height*target_size/width), target_size)
-	else:
-		return (target_size, int(width*target_size/height))
+	return (target_size, int(width*target_size/height))
 	
 
 """ Добавление файла """
@@ -44,8 +42,7 @@ def upload_file_base64(b64_string, path):
 
 """ Convert sql date to text format """
 def date_to_text(date: str) -> str:
-	dt = datetime.datetime.strptime(date, '%a, %d %b %Y %H:%M:%S %Z')
-	return dt.strftime('%d.%m.%Y')\
+	return datetime.datetime.strptime(date, '%a, %d %b %Y %H:%M:%S %Z').strftime('%d.%m.%Y')
 	
 
 """ Check and convert date from textfields to valid sql date format """
@@ -114,9 +111,9 @@ def get_filtered_items(items, start, end, category):
 			return [r for r in items if r["category"] == category]
 		elif category == 'all':
 			return [r for r in items if start <= date_to_sql(date_to_text(r["creation_date"])) <= end]
-		else:
-			return [r for r in items if r["category"] == category and \
-				start <= date_to_sql(date_to_text(r["creation_date"])) <= end]
+		return [r for r in items if r["category"] == category and \
+			start <= date_to_sql(date_to_text(r["creation_date"])) <= end]
 	except Exception as e:
 		print(e)
 		return None
+

@@ -36,8 +36,7 @@ def main(page: ft.Page):
 	except Exception as e:
 		# default theme
 		page.theme = ft.Theme(color_scheme_seed='#D4E9F7')
-	finally:
-		page.theme_mode=ft.ThemeMode.LIGHT
+	page.theme_mode=ft.ThemeMode.LIGHT
 
 	# need to fix icon
 	page.window.prevent_close = True
@@ -72,43 +71,38 @@ def main(page: ft.Page):
 			page.update()
 			page.window.close() 
 
+	def parse_detailed_view_params():
+		# parsing params from URL
+		parsed = urllib.parse.urlparse(page.route)
+		params = urllib.parse.parse_qs(parsed.query)
+		_id = params.get("id", [""])[0]
+		img = params.get("img", [""])[0]
+		category = params.get("category", [""])[0]
+		date = params.get("date", [""])[0]
+		_sum = params.get("sum", [""])[0]
+
+		# decoding route params 
+		id_ = urllib.parse.unquote(_id)
+		img_ = urllib.parse.unquote(img)
+		category_ = urllib.parse.unquote(category)
+		date_ = urllib.parse.unquote(date)
+		sum_ = urllib.parse.unquote(_sum)
+		return [id_, img_, category_, date_, sum_]
+
 
 	def route_change(route):
-		print(f"changed route: {page.route}")
+		print(f"- {page.route}")
 		page.views.clear()
 		if page.route == '/login':
-			login_view = views.LoginView(page)
-			page.views.append(login_view)
+			page.views.append(views.LoginView(page))
 		elif page.route == "/items":
-			items_view = views.ItemsView(page)
-			items_view.reload_items()
-			page.views.append(items_view)
+			page.views.append(views.ItemsView(page))
 		elif page.route == "/newitem":
-			new_item_view = views.NewItemView(page)
-			page.views.append(new_item_view)
+			page.views.append(views.NewItemView(page))
 		elif page.route == "/category":
-			category_view = views.CategoryView(page)
-			category_view.load_categories()
-			page.views.append(category_view)
+			page.views.append(views.CategoryView(page))
 		elif page.route.startswith("/detailedview"):
-			# Парсим параметры из URL
-			parsed = urllib.parse.urlparse(page.route)
-			params = urllib.parse.parse_qs(parsed.query)
-			_id = params.get("id", [""])[0]
-			img = params.get("img", [""])[0]
-			category = params.get("category", [""])[0]
-			date = params.get("date", [""])[0]
-			_sum = params.get("sum", [""])[0]
-
-			# Декодируем параметры
-			id_ = urllib.parse.unquote(_id)
-			img_ = urllib.parse.unquote(img)
-			category_ = urllib.parse.unquote(category)
-			date_ = urllib.parse.unquote(date)
-			sum_ = urllib.parse.unquote(_sum)
-
-			image_view = views.DetailedView(page, id_, img_, category_, date_, sum_)
-			page.views.append(image_view)
+			page.views.append(views.DetailedView(page, *parse_detailed_view_params()))
 		page.update()
 			
 

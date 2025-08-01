@@ -94,7 +94,7 @@ class ItemsView(ft.View):
 		self.end_filter_field = ft.TextField(label="Конец")
 		self.category_dropdown = ft.Dropdown(
 				label="Категория",
-				options=[ft.dropdown.Option("", "Все")] + [ft.dropdown.Option(c) for c in self.load_categories(return_categories=True)],
+				options=[ft.dropdown.Option("", "Все")] + [ft.dropdown.Option(c["category"]) for c in self.load_categories(return_categories=True)],
 				value="Все"
 		)
 		self.reload_button = ft.IconButton(
@@ -147,6 +147,8 @@ class ItemsView(ft.View):
 			actions_alignment=ft.MainAxisAlignment.CENTER,
 		)
 
+		self.reload_items()
+
 	""" Add item row to table """
 	def add_row(self, item):
 		date_ = utils.date_to_text(item['creation_date'])
@@ -185,7 +187,8 @@ class ItemsView(ft.View):
 		resp = requests.get(f'{self.page.ROOT_URL}/categories', headers=self.page.request_headers)
 		if resp.status_code in [200, 204]:
 			self.page.categories = resp.json()
-			if return_categories: return resp.json()
+			if return_categories: 
+				return resp.json()
 
 	""" Load file image from server and save it to local storage """
 	def load_photo(self, item):
@@ -236,7 +239,6 @@ class ItemsView(ft.View):
 
 	""" Get item filtered by date"""	
 	def apply_filter(self, e):
-		print(self.start_filter_field.value, self.end_filter_field.value, self.category_dropdown.value)
 		start = utils.date_to_sql(self.start_filter_field.value)
 		end = utils.date_to_sql(self.end_filter_field.value)
 		category = self.category_dropdown.value
@@ -251,11 +253,9 @@ class ItemsView(ft.View):
 				self.reset_filter() 
 				return
 			else:
-				print(start, end, category)
 				filtered = utils.get_filtered_items(self.page.loaded_items, start, end, category)
 				if not filtered is None:
 					self.page.filtered_items = filtered
-					print("filtered:", len(filtered), "loaded:", len(self.page.loaded_items))
 					self.reload_items()
 					print("=> Items table filtered")
 				else:
@@ -267,8 +267,12 @@ class ItemsView(ft.View):
 	otherwise returns report about all items 
 	"""
 	def get_report(self, e):
+		if self.page.filtered_items is None:
+			items = self.page.loaded_items
+		else:
+			items = self.page.filtered_items
 		id_list = json.dumps({
-			"id_list": [int(r['id']) for r in self.page.loaded_items]
+			"id_list": [int(item['id']) for item in items]
 		})
 		resp = requests.get(f'{self.page.ROOT_URL}/report', data=id_list, headers=self.page.special_request_headers)
 		print(resp)
@@ -298,7 +302,7 @@ class DetailedView(ft.View):
 			text="Удалить",
 			icon=ft.Icons.DELETE, 
 			on_click=lambda e: utils.show_dialog(self,
-			 "Вы уверены, что хотите удалить элемент?", 
+			 "Вы уверены, что хотите удалить этот объект?", 
 			 "Позже его нельзя будет восстановить"
 			 )
 		)
@@ -378,11 +382,14 @@ class DetailedView(ft.View):
 	
 
 	def delete_item(self, e=None):
-		response = requests.delete(f"{self.page.ROOT_URL}/delete/{int(self.id)}",  headers=self.page.special_request_headers)
+		response = requests.delete(f"{self.page.ROOT_URL}/delete-item/{int(self.id)}",  headers=self.page.special_request_headers)
 		print(response)
-		print(f"=> Deleted item id={id}")
-		utils.close_dialog(self)
-		self.page.go("/items")
+		if response.status_code in (200, 204):
+			print(f"=> Deleted item id={id}")
+			utils.close_dialog(self)
+			self.page.filtered_items = None
+			self.page.loaded_items = None
+			self.page.go("/items")
 
 
 
@@ -411,7 +418,7 @@ class NewItemView(ft.View):
 		# Поля формы
 		self.category_dropdown = ft.Dropdown(
 				label="Категория",
-				options=[ft.dropdown.Option(c) for c in self.page.categories],
+				options=[ft.dropdown.Option(c["category"]) for c in self.page.categories],
 		)
 		self.sum_field = ft.TextField(
 			label="Сумма",
@@ -650,9 +657,9 @@ class NewItemView(ft.View):
 			"creation_date": date_,
 			"image": img_base64
 		})
-		response = requests.post(f'{self.page.ROOT_URL}/add', data=new_item, headers=self.page.special_request_headers)
+		response = requests.post(f'{self.page.ROOT_URL}/add-item', data=new_item, headers=self.page.special_request_headers)
 		print(response)
-		utils.show_dialog(self, "Данные отправлены!", "Чтобы увидеть изменения, перезагрузите страницу")
+		utils.show_dialog(self, "Объект сохранен", "Чтобы увидеть изменения, перезагрузите страницу")
 		self.page.update()
 
 
@@ -684,6 +691,7 @@ class CategoryView(ft.View):
 		self.table = ft.DataTable(
 			columns=[
 				ft.DataColumn(ft.Text("")),
+				ft.DataColumn(ft.Text("")),
 			],
 			rows=[],
 			expand=True
@@ -700,7 +708,7 @@ class CategoryView(ft.View):
 					alignment=ft.MainAxisAlignment.CENTER,
 					spacing=50,
 				),
-				self.table
+				ft.ListView(controls=[self.table], expand=True)
 			],
 			alignment=ft.MainAxisAlignment.CENTER,
 			horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -721,19 +729,22 @@ class CategoryView(ft.View):
 		self.controls.append(self.appbar)	
 		self.controls.append(self.main_content)
 
+		self.load_categories()
+
 	""" Add new category to db """
 	def add_category(self, e=None):
 		category = self.new_category_field.value
 		if not str(category).isalnum():
 			print(f"Wrong 'category' field format")
-			utils.show_dialog(self, "Заполните данные!", "вы не указали название новой категории")
+			utils.show_dialog(self, "Заполните данные!", "Поле с названием новой категории не может быть пустым")
 		else:
 			new_category = json.dumps({
 				"category": category,
 			})
-			response = requests.post(f'{self.page.ROOT_URL}/category', data=new_category, headers=self.page.special_request_headers)
+			response = requests.post(f'{self.page.ROOT_URL}/add-category', data=new_category, headers=self.page.special_request_headers)
 			print(response)
-			utils.show_dialog(self, "Данные отправлены!", "Новая категория сохранена")
+			utils.show_dialog(self, "Категория сохранена", "Данные таблицы обновлены")
+			self.load_categories()
 			self.page.update()
 		
 	
@@ -742,7 +753,18 @@ class CategoryView(ft.View):
 		self.table.rows.append(
 			ft.DataRow(
 				cells=[
-					ft.DataCell(ft.Text(category, selectable=True))
+					ft.DataCell(ft.Text(category["category"], selectable=True)),
+					ft.DataCell(
+						ft.Container(
+							content=ft.ElevatedButton(
+								text="Удалить",
+								icon=ft.Icons.DELETE,
+								on_click=lambda e: self.delete_category(category=category)
+							),
+							alignment=ft.alignment.center_right,
+							expand=True, 
+						)
+					)
 				]
 			)
 		)
@@ -754,10 +776,21 @@ class CategoryView(ft.View):
 		if resp.status_code in [200, 204]:
 			self.table.rows.clear()
 			self.page.categories = resp.json()
-			for cat in self.page.categories:
-				self.add_row(cat)
+			for category in self.page.categories:
+				self.add_row(category)
 			print("=> Loaded categories")
 
+	def delete_category(self, e=None, category=None):
+		if any([category["category"]==item["category"] for item in self.page.loaded_items]):
+			utils.show_dialog(self, "Категория используется!", "Нельзя удалить категорию, которая используется одним или более объектом")
+			return
+		id = category["id"]
+		response = requests.delete(f"{self.page.ROOT_URL}/delete-category/{id}",  headers=self.page.special_request_headers)
+		print(response)
+		if response.status_code in (200, 204):
+			print(f"=> Deleted category id={id}")
+			utils.show_dialog(self, "Категория удалена", "Данные таблицы обновлены")
+			self.load_categories()
 	
 	def on_exit(self, e=None):
 		self.page.go('/items')
