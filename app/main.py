@@ -46,6 +46,7 @@ def main(page: ft.Page):
 	page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
 
 	page.title = "ItemScanner"
+	page.current_session_username = None
 	page.token = None
 	page.request_headers = None
 	page.loaded_items = None
@@ -101,6 +102,8 @@ def main(page: ft.Page):
 			page.views.append(views.NewItemView(page))
 		elif page.route == "/category":
 			page.views.append(views.CategoryView(page))
+		elif page.route == "/user":
+			page.views.append(views.UserView(page))
 		elif page.route.startswith("/detailedview"):
 			page.views.append(views.DetailedView(page, *parse_detailed_view_params()))
 		page.update()

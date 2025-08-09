@@ -56,6 +56,7 @@ class LoginView(ft.View):
 		print(resp)
 		if resp.status_code in (200, 204):
 			token = resp.json()['access_token']
+			self.page.current_session_username = credentials['username']
 			self.page.request_headers = {'Authorization': f'Bearer {token}'}
 			self.page.special_request_headers = {
 				'Content-Type': 'application/json',
@@ -90,8 +91,8 @@ class ItemsView(ft.View):
 		)
 		
 		self.controls.append(ft.AppBar(title=ft.Text("База данных"), bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST))
-		self.start_filter_field = ft.TextField(label="Начало")
-		self.end_filter_field = ft.TextField(label="Конец")
+		self.start_filter_field = ft.TextField(label="Начальная дата")
+		self.end_filter_field = ft.TextField(label="Конечная дата")
 		self.category_dropdown = ft.Dropdown(
 				label="Категория",
 				options=[ft.dropdown.Option("", "Все")] + [ft.dropdown.Option(c["category"]) for c in self.load_categories(return_categories=True)],
@@ -107,33 +108,37 @@ class ItemsView(ft.View):
 			icon=ft.Icons.CATEGORY, 
 			on_click=lambda e: self.page.go('/category')
 		)
-		self.controls.append(ft.Text(value="Фильтр по датам"))
+		self.user_button = ft.ElevatedButton(
+			"Пользователи", 
+			icon=ft.Icons.PERSON, 
+			on_click=lambda e: self.page.go('/user')
+		)
 		self.controls.append(
-			ft.Row([
+			ft.Column([
 				ft.Row([
+					self.category_button,
+					self.user_button,
+					ft.ElevatedButton(
+						"Сформировать отчет", 
+						on_click=self.get_report
+					),
+					ft.ElevatedButton(
+						"Добавить объект", 
+						on_click=lambda e: self.page.go('/newitem')
+					),
+					self.reload_button
+				]),
+				ft.Row([
+					self.category_dropdown,
 					self.start_filter_field,
 					self.end_filter_field,
 					ft.ElevatedButton(
 						"Отфильтровать", 
 						on_click=self.apply_filter
-					),
-					self.reload_button
-				]),
-				ft.Row([
-					ft.ElevatedButton(
-						"Сформировать отчет", 
-						on_click=self.get_report
-					),
-					self.category_button,
-					ft.ElevatedButton(
-						"Добавить", 
-						on_click=lambda e: self.page.go('/newitem')
 					)
-				])
-			],
-			alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-		)),
-		self.controls.append(self.category_dropdown)
+				]),
+			])
+		),
 
 		self.controls.append(self.item_count)
 		
@@ -663,7 +668,7 @@ class NewItemView(ft.View):
 		self.page.update()
 
 
-""" Creating new item """
+""" Creating new category """
 class CategoryView(ft.View):
 	def __init__(self, page: ft.Page):
 		super().__init__(route='/category')
@@ -734,7 +739,7 @@ class CategoryView(ft.View):
 	""" Add new category to db """
 	def add_category(self, e=None):
 		category = self.new_category_field.value
-		if not str(category).isalnum():
+		if not "".join(category.split(" ")).isalnum():
 			print(f"Wrong 'category' field format")
 			utils.show_dialog(self, "Заполните данные!", "Поле с названием новой категории не может быть пустым")
 		else:
@@ -743,9 +748,12 @@ class CategoryView(ft.View):
 			})
 			response = requests.post(f'{self.page.ROOT_URL}/add-category', data=new_category, headers=self.page.special_request_headers)
 			print(response)
-			utils.show_dialog(self, "Категория сохранена", "Данные таблицы обновлены")
-			self.load_categories()
-			self.page.update()
+			if response.status_code in (200, 204):
+				utils.show_dialog(self, "Категория сохранена", "Данные таблицы обновлены")
+				self.load_categories()
+				self.page.update()
+			else:
+				utils.show_dialog(self, "Ошибка!", "Такая категория уже существует. Выберите другое название")
 		
 	
 	""" Add item row to table """
@@ -791,6 +799,145 @@ class CategoryView(ft.View):
 			print(f"=> Deleted category id={id}")
 			utils.show_dialog(self, "Категория удалена", "Данные таблицы обновлены")
 			self.load_categories()
+	
+	def on_exit(self, e=None):
+		self.page.go('/items')
+
+
+""" Creating new user """
+class UserView(ft.View):
+	def __init__(self, page: ft.Page):
+		super().__init__(route='/user')
+		self.page = page
+		self.username_field = ft.TextField(label="Имя пользователя", width=300)
+		self.password_field = ft.TextField(label="Пароль", width=300)
+		self.add_button = ft.ElevatedButton(text="Добавить", on_click=self.add_user)
+		self.reload_button = ft.IconButton(
+			icon=ft.Icons.REFRESH,
+			tooltip="Reload",
+			on_click=self.load_usernames
+		)
+
+		# AppBar
+		self.appbar = ft.AppBar(
+			leading=ft.IconButton(
+				icon=ft.Icons.ARROW_BACK,
+				tooltip="Назад",
+				on_click=self.on_exit
+			),
+			title=ft.Text("Список пользователей"),
+			bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST
+		)
+
+		# Blank table for items
+		self.table = ft.DataTable(
+			columns=[
+				ft.DataColumn(ft.Text("Имя пользователя")),
+				ft.DataColumn(ft.Text(""))
+			],
+			rows=[],
+			expand=True
+		)
+
+		self.main_content = ft.Column(
+			controls=[
+				ft.Row(
+					controls=[
+						self.username_field,
+						self.password_field,
+						self.add_button,
+						self.reload_button
+					],
+					alignment=ft.MainAxisAlignment.CENTER,
+					spacing=50,
+				),
+				ft.ListView(controls=[self.table], expand=True)
+			],
+			alignment=ft.MainAxisAlignment.CENTER,
+			horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+			spacing=10,
+			expand=True,
+			scroll=ft.ScrollMode.AUTO
+		)
+
+		self.page.dialog = ft.AlertDialog(
+			title=ft.Container(ft.Text(""), alignment=ft.alignment.center),
+			content=ft.Text(""),
+			actions=[
+				ft.TextButton("OK", on_click=lambda e: utils.close_dialog(self))
+			],
+			actions_alignment=ft.MainAxisAlignment.CENTER,
+		)
+
+		self.controls.append(self.appbar)	
+		self.controls.append(self.main_content)
+
+		self.load_usernames()
+
+	""" Add new user to db """
+	def add_user(self, e=None):
+		username = self.username_field.value
+		password = self.password_field.value
+		if not str(username).isalnum() or not str(password).isalnum():
+			print(f"Wrong inout data format")
+			utils.show_dialog(self, "Заполните данные!", "Поля с именем и паролем не могут быть пустыми")
+		else:
+			new_user = json.dumps({
+				"username": username,
+				"password": password
+			})
+			response = requests.post(f'{self.page.ROOT_URL}/add-user', data=new_user, headers=self.page.special_request_headers)
+			print(response)
+			if response.status_code in (200, 204):
+				utils.show_dialog(self, "Пользователь сохранен", "Данные таблицы обновлены")
+				self.load_usernames()
+				self.page.update()
+			else:
+				utils.show_dialog(self, "Ошибка!", "Пользователь с таким именем уже существует")
+		
+	
+	""" Add item row to table """
+	def add_row(self, username):
+		self.table.rows.append(
+			ft.DataRow(
+				cells=[
+					ft.DataCell(ft.Text(username, selectable=True)),
+					ft.DataCell(
+						ft.Container(
+							content=ft.ElevatedButton(
+								text="Удалить",
+								icon=ft.Icons.DELETE,
+								on_click=lambda e: self.delete_user(username=username)
+							),
+							alignment=ft.alignment.center_right,
+							expand=True, 
+						)
+					)
+				]
+			)
+		)
+		self.page.update()
+
+	""" Load list of active users from server """
+	def load_usernames(self, e=None):
+		resp = requests.get(f'{self.page.ROOT_URL}/usernames', headers=self.page.request_headers)
+		if resp.status_code in [200, 204]:
+			self.table.rows.clear()
+			self.page.usernames = [user["username"] for user in resp.json()]
+			for username in self.page.usernames:
+				self.add_row(username)
+			print("=> Loaded usernames")
+
+	def delete_user(self, e=None, username=None):
+		if username == self.page.current_session_username:
+			utils.show_dialog(self, "Ошибка!", "Нельзя удалить данные пользователя, который используется вами в данный момент")
+			return
+		response = requests.delete(f"{self.page.ROOT_URL}/delete-user/{username}",  headers=self.page.special_request_headers)
+		print(response)
+		if response.status_code in (200, 204):
+			print(f"=> Deleted user = {username}")
+			utils.show_dialog(self, "Пользователь удален", "Данные таблицы обновлены")
+			self.load_usernames()
 	
 	def on_exit(self, e=None):
 		self.page.go('/items')
