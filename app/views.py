@@ -56,7 +56,9 @@ class LoginView(ft.View):
 		print(resp)
 		if resp.status_code in (200, 204):
 			token = resp.json()['access_token']
-			self.page.current_session_username = credentials['username']
+			user_data = resp.json()['user_data']
+			self.page.current_session_username = user_data['username']
+			self.page.current_session_admin = user_data['admin']
 			self.page.request_headers = {'Authorization': f'Bearer {token}'}
 			self.page.special_request_headers = {
 				'Content-Type': 'application/json',
@@ -69,7 +71,7 @@ class LoginView(ft.View):
 		self.update()
 
 
-""" Main items table with filters """
+""" Items table with filtering """
 class ItemsView(ft.View):
 	def __init__(self, page: ft.Page):
 		super().__init__("/items")
@@ -113,32 +115,60 @@ class ItemsView(ft.View):
 			icon=ft.Icons.PERSON, 
 			on_click=lambda e: self.page.go('/user')
 		)
-		self.controls.append(
-			ft.Column([
-				ft.Row([
-					self.category_button,
-					self.user_button,
-					ft.ElevatedButton(
-						"Сформировать отчет", 
-						on_click=self.get_report
-					),
-					ft.ElevatedButton(
-						"Добавить объект", 
-						on_click=lambda e: self.page.go('/newitem')
-					),
-					self.reload_button
-				]),
-				ft.Row([
-					self.category_dropdown,
-					self.start_filter_field,
-					self.end_filter_field,
-					ft.ElevatedButton(
-						"Отфильтровать", 
-						on_click=self.apply_filter
-					)
-				]),
-			])
-		),
+
+		if self.page.current_session_admin:
+			self.controls.append(
+				ft.Column([
+					ft.Row([
+						self.category_button,
+						self.user_button,
+						ft.ElevatedButton(
+							"Сформировать отчет", 
+							on_click=self.get_report
+						),
+						ft.ElevatedButton(
+							"Добавить объект", 
+							on_click=lambda e: self.page.go('/newitem')
+						),
+						self.reload_button
+					]),
+					ft.Row([
+						self.category_dropdown,
+						self.start_filter_field,
+						self.end_filter_field,
+						ft.ElevatedButton(
+							"Отфильтровать", 
+							on_click=self.apply_filter
+						)
+					]),
+				])
+			),
+		else:
+			self.controls.append(
+				ft.Column([
+					ft.Row([
+						ft.ElevatedButton(
+							"Сформировать отчет", 
+							on_click=self.get_report
+						),
+						ft.ElevatedButton(
+							"Добавить объект", 
+							on_click=lambda e: self.page.go('/newitem')
+						),
+						self.reload_button
+					]),
+					ft.Row([
+						self.category_dropdown,
+						self.start_filter_field,
+						self.end_filter_field,
+						ft.ElevatedButton(
+							"Отфильтровать", 
+							on_click=self.apply_filter
+						)
+					]),
+				])
+			),
+		
 
 		self.controls.append(self.item_count)
 		
@@ -152,7 +182,7 @@ class ItemsView(ft.View):
 			actions_alignment=ft.MainAxisAlignment.CENTER,
 		)
 
-		self.reload_items()
+		self.load_items()
 
 	""" Add item row to table """
 	def add_row(self, item):
@@ -202,7 +232,7 @@ class ItemsView(ft.View):
 			f.write(resp.content)
 
 	""" Load items from buffer and add them to table """
-	def reload_items(self):
+	def load_items(self):
 		self.table.rows.clear()
 		if self.page.loaded_items is None:
 			self.load_all_items()
@@ -239,7 +269,7 @@ class ItemsView(ft.View):
 		self.category_dropdown.value = "Все"
 		self.page.filtered_items = None
 		self.page.loaded_items = None
-		self.reload_items()
+		self.load_items()
 		print("=> Filter was reset")
 
 	""" Get item filtered by date"""	
@@ -261,7 +291,7 @@ class ItemsView(ft.View):
 				filtered = utils.get_filtered_items(self.page.loaded_items, start, end, category)
 				if not filtered is None:
 					self.page.filtered_items = filtered
-					self.reload_items()
+					self.load_items()
 					print("=> Items table filtered")
 				else:
 					print("! Error while filtering items")

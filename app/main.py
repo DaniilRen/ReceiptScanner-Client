@@ -46,9 +46,13 @@ def main(page: ft.Page):
 	page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
 
 	page.title = "ItemScanner"
-	page.current_session_username = None
+	# needed for correct views work according to account rights 
+	page.current_session_username = None 
+	page.current_session_admin = None
+	# needed for requests to api
 	page.token = None
 	page.request_headers = None
+	# stroring loaded objects
 	page.loaded_items = None
 	page.filtered_items = None 
 	page.categories = []
