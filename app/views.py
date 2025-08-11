@@ -811,11 +811,16 @@ class UserView(ft.View):
 		self.page = page
 		self.username_field = ft.TextField(label="Имя пользователя", width=300)
 		self.password_field = ft.TextField(label="Пароль", width=300)
+		self.admin_rights_dropdown = ft.Dropdown(
+				label="Администратор",
+				options=[ft.dropdown.Option(1, "Да"), ft.dropdown.Option(0, "Нет")],
+				width=200
+		)
 		self.add_button = ft.ElevatedButton(text="Добавить", on_click=self.add_user)
 		self.reload_button = ft.IconButton(
 			icon=ft.Icons.REFRESH,
 			tooltip="Reload",
-			on_click=self.load_usernames
+			on_click=self.load_users
 		)
 
 		# AppBar
@@ -833,6 +838,7 @@ class UserView(ft.View):
 		self.table = ft.DataTable(
 			columns=[
 				ft.DataColumn(ft.Text("Имя пользователя")),
+				ft.DataColumn(ft.Text("Права администратора")),
 				ft.DataColumn(ft.Text(""))
 			],
 			rows=[],
@@ -845,6 +851,7 @@ class UserView(ft.View):
 					controls=[
 						self.username_field,
 						self.password_field,
+						self.admin_rights_dropdown,
 						self.add_button,
 						self.reload_button
 					],
@@ -872,36 +879,44 @@ class UserView(ft.View):
 		self.controls.append(self.appbar)	
 		self.controls.append(self.main_content)
 
-		self.load_usernames()
+		self.load_users()
 
 	""" Add new user to db """
 	def add_user(self, e=None):
 		username = self.username_field.value
 		password = self.password_field.value
-		if not str(username).isalnum() or not str(password).isalnum():
-			print(f"Wrong inout data format")
-			utils.show_dialog(self, "Заполните данные!", "Поля с именем и паролем не могут быть пустыми")
+		admin = self.admin_rights_dropdown.value
+		if not str(username).isalnum() or not str(password).isalnum() or int(admin) not in [0, 1]:
+			print(f"! Wrong input data format")
+			utils.show_dialog(self, "Заполните данные!", "Проверьте, что в каждом поле указано значение")
 		else:
 			new_user = json.dumps({
 				"username": username,
-				"password": password
+				"password": password,
+				"admin": int(admin)
 			})
 			response = requests.post(f'{self.page.ROOT_URL}/add-user', data=new_user, headers=self.page.special_request_headers)
 			print(response)
 			if response.status_code in (200, 204):
 				utils.show_dialog(self, "Пользователь сохранен", "Данные таблицы обновлены")
-				self.load_usernames()
+				self.load_users()
 				self.page.update()
 			else:
 				utils.show_dialog(self, "Ошибка!", "Пользователь с таким именем уже существует")
 		
 	
 	""" Add item row to table """
-	def add_row(self, username):
+	def add_row(self, user):
+		username = user["username"]
+		if user["admin"] == 0:
+			admin = 'Нет'
+		else:
+			admin = 'Да'
 		self.table.rows.append(
 			ft.DataRow(
 				cells=[
 					ft.DataCell(ft.Text(username, selectable=True)),
+					ft.DataCell(ft.Text(admin, selectable=False)),
 					ft.DataCell(
 						ft.Container(
 							content=ft.ElevatedButton(
@@ -919,14 +934,13 @@ class UserView(ft.View):
 		self.page.update()
 
 	""" Load list of active users from server """
-	def load_usernames(self, e=None):
-		resp = requests.get(f'{self.page.ROOT_URL}/usernames', headers=self.page.request_headers)
+	def load_users(self, e=None):
+		resp = requests.get(f'{self.page.ROOT_URL}/users', headers=self.page.request_headers)
 		if resp.status_code in [200, 204]:
 			self.table.rows.clear()
-			self.page.usernames = [user["username"] for user in resp.json()]
-			for username in self.page.usernames:
-				self.add_row(username)
-			print("=> Loaded usernames")
+			for user in resp.json():
+				self.add_row(user)
+			print("=> Loaded users")
 
 	def delete_user(self, e=None, username=None):
 		if username == self.page.current_session_username:
@@ -937,7 +951,7 @@ class UserView(ft.View):
 		if response.status_code in (200, 204):
 			print(f"=> Deleted user = {username}")
 			utils.show_dialog(self, "Пользователь удален", "Данные таблицы обновлены")
-			self.load_usernames()
+			self.load_users()
 	
 	def on_exit(self, e=None):
 		self.page.go('/items')
