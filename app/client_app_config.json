@@ -1,6 +1,6 @@
 {
 	"ROOT_URL": "http://127.0.0.1:8000",
 	"TIMER_RATE": 0.03,
-	"STORAGE_PATH": "/home/danb/Code/ReceiptScanner-Client/temp",
+	"STORAGE_PATH": "",
 	"THEME": ""
 }
