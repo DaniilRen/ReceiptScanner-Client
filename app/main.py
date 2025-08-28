@@ -15,14 +15,10 @@ def main(page: ft.Page):
 		page.THEME = config["THEME"]
 		print(f"=> Set default params: theme={page.THEME}, timer rate={page.TIMER_RATE}, root url={page.ROOT_URL}")
 		
-		# check if app runs as executable
-		page.executable = getattr(sys, 'frozen', False)
-		# create temp storage: config STORAGE_PATH should be absolute path to storage
-		if page.executable:
-			storage_dir = os.path.realpath(config["STORAGE_PATH"])
+		if config["STORAGE_PATH"] == "":
+			storage_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), 'storage'))
 		else:
-			print("! Application runs in development mode")
-			storage_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), 'assets'))
+			storage_dir = os.path.realpath(config["STORAGE_PATH"])
 		os.makedirs(os.path.join(storage_dir, 'temp'), exist_ok=True)
 		page.STORAGE_PATH = storage_dir
 		print(f"=> Created storage dir: {storage_dir}")
